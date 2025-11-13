@@ -65,14 +65,18 @@ class BDFEXT(nn.Module):
         alphas2 = []
         Hbub=[]
         HbTb=[]
+
+        Ehist = np.zeros(len(ts))
+        E = pt.tensordot(self.op.Mb(u),u,dims=u.dim())
+        Ehist[0] = E.item()
         
         if cb is not None:
             uc = u.clone()
             pc = p.clone()
             Tc = T.clone() if T is not None else None
             sol = Solution(uc,pc,Tc)
-            cb(0,ts[0].clone(),sol,self.op)
-            
+            cb(0,ts[0].clone(),sol,None,Ehist,self.op)
+
         for i, t in enumerate(ts[1:]):
             o = min(k,i+1) # temporal order
             if i < 4:
@@ -97,10 +101,16 @@ class BDFEXT(nn.Module):
 #           b=self.op.R(b+self.op.DT(ps))
 #           us=self.op.RT(self.op.Hinv(b))+ub
             us=self.op.RT_Hinv_R(b)+ub
+            ud = u
+            pd = p
             u,p=self.op.incomp(us,ps,bdti1)
+
+            ud = u - ud
+            pd = p - pd
             
             if T is None:
                 c = self.op.Cb(u,u)
+                Td = None
             else:
                 Tstar = td1(alphas,self.Tlag).reshape(-1,T.shape[-2],T.shape[-1])
                 cmb = pt.cat([u,Tstar],dim=0)
@@ -110,16 +120,27 @@ class BDFEXT(nn.Module):
                 b=b-tmp[-1]
                 b=b-HbTb
 #               T=self.op.RT(self.op.Hinv(self.op.R(b)))+Tb
+                Td = T
                 T=self.op.RT_Hinv_R(b)+Tb
+                Td = T - Td
             
             self.lag(u,p,T,c)
+            E = pt.tensordot(self.op.Mb(u),u,dims=u.dim())
+            Ehist[i+1] = E.item()
             
             if cb is not None and (np.mod(i+1,ipstep) == 0 or np.mod(i+1,iostep) == 0):
                 uc = u.clone()
                 pc = p.clone()
                 Tc = T.clone() if T is not None else None
+                Ec = Ehist.copy()
+
                 sol = Solution(uc,pc,Tc)
-                cb(i+1,t.clone(),sol,self.op)
+                sollag = Solution(
+                    self.ulag[1].clone(),
+                    self.plag[1].clone(),
+                    self.Tlag[1].clone() if T is not None else None
+                )
+                cb(i+1,t.clone(),sol,sollag,Ec,self.op)
             
         sol = Solution(u,p,T)
         return sol

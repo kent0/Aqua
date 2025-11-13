@@ -1,18 +1,19 @@
-from ast import Call
+from .op2d import Op
+from .setops import setops
+from .problem import problem
+from .advance import BDFEXT, Solution
+from .util import mag, Solution
+from .vis import vis
 
-from torch._prims_common import prod
-from op2d import Op
-from setops import setops
-from problem import problem
-from advance import BDFEXT
 import matplotlib.pyplot as plt
+
 import torch as pt
-from util import mag, Solution
-from vis import vis
 import numpy as np
 import h5py
 import scipy.sparse.linalg as spla
-from advance import Solution
+from ast import Call
+
+from torch._prims_common import prod
 
 def stokes(Nx,Ny,cname,u0=[],pfx="",heat=False):
     # usage: ns(32,32,100,1e-3,"ldc",1/1000,[]);

@@ -55,8 +55,8 @@ def einsum(*args: Any) -> Tensor:
         equation = args[0]
         operands = args[1:]
 
-    if has_torch_function(operands):
-        return handle_torch_function(einsum, operands, equation, *operands)
+#   if has_torch_function(operands):
+#       return handle_torch_function(einsum, operands, equation, *operands)
 
     if len(operands) == 1 and isinstance(operands[0], (list, tuple)):
         _operands = operands[0]
@@ -120,7 +120,7 @@ def xop_fast(*args: Tensor) -> Tensor:
     else:
         raise Exception(f'Error: expected 3 or 5 arguments to xop_fast, received {len(args)}')
         
-def xop(
+def xop_dummy(
     M1: Tensor,
     M2: Tensor,
     x: Tensor
@@ -238,7 +238,8 @@ class OpInv(pt.nn.Module):
         if len(shape) == 2:
             x.unsqueeze(0)
         
-        res = xop(self.Sx,self.Sy,self.Dinv*xop(self.Sx.T,self.Sy.T,x))
+#       res = xop(self.Sx,self.Sy,self.Dinv*xop(self.Sx.T,self.Sy.T,x))
+        res = xop_fast(self.Sx.T,self.Sy,self.Dinv*xop_fast(self.Sx,self.Sy.T,x))
         return res.reshape(shape)
     
 class Op(pt.nn.Module):
@@ -251,7 +252,16 @@ class Op(pt.nn.Module):
     ) -> None:
         super().__init__()
         
-        self.Mbxn,self.Mbyn,self.Dbxn,self.Dbyn,self.Xn,self.Mbxm,self.Mbym,self.Dbxm,self.Dbym,self.Xm,self. Mbxp,self.Mbyp,self.Dbxp,self.Dbyp,self.Xp,self.Jxnm,self.Jynm,self.Jxpn,self.Jypn,self.Rx,self.Ry = setops((Nx,Ny),dom,bc,fullmass=True)
+        (
+            self.Mbxn_diag,
+            self.Mbyn_diag,
+            self.Mbxn,
+            self.Mbyn,
+            self.Dbxn,self.Dbyn,self.Xn,self.Mbxm,self.Mbym,self.Dbxm,self.Dbym,self.Xm,self. Mbxp,self.Mbyp,self.Dbxp,self.Dbyp,self.Xp,self.Jxnm,self.Jynm,self.Jxpn,self.Jypn,self.Rx,self.Ry
+        ) = setops((Nx,Ny),dom,bc,fullmass=False)
+
+        self.Mbxn_diag = pt.diag(self.Mbxn_diag)
+        self.Mbyn_diag = pt.diag(self.Mbyn_diag)
         
         self.D1x = Buffer(self.Jxpn.T @ self.Mbxn @ self.Dbxn)
         self.D1y = Buffer(self.Jypn.T @ self.Mbyn)
@@ -273,7 +283,8 @@ class Op(pt.nn.Module):
         self.Bxi=Buffer(pt.linalg.inv(self.Rx@self.Mbxn@self.Rx.T))
         self.Byi=Buffer(pt.linalg.inv(self.Ry@self.Mbyn@self.Ry.T))
         
-        self.Binv = lambda x: xop(self.Bxi,self.Byi,x)
+#       self.Binv = lambda x: xop(self.Bxi,self.Byi,x)
+        self.Binv = lambda x: xop_fast(self.Bxi,self.Byi,x)
 
         Bx=self.Jxpn.T@self.Mbxn@self.Rx.T@self.Bxi@self.Rx@self.Mbxn@self.Jxpn
         By=self.Jypn.T@self.Mbyn@self.Ry.T@self.Byi@self.Ry@self.Mbyn@self.Jypn
@@ -297,8 +308,10 @@ class Op(pt.nn.Module):
         self.RT_Binv_R_DT_2y = Buffer(self.Ry.T @ self.Byi @ self.Ry @ self.D2y.T)
         
         self.RT_Binv_R_DT = lambda x: pt.stack((
-            xop(self.RT_Binv_R_DT_1x,self.RT_Binv_R_DT_1y,x),
-            xop(self.RT_Binv_R_DT_2x,self.RT_Binv_R_DT_2y,x)
+#           xop(self.RT_Binv_R_DT_1x,self.RT_Binv_R_DT_1y,x),
+#           xop(self.RT_Binv_R_DT_2x,self.RT_Binv_R_DT_2y,x)
+            xop_fast(self.RT_Binv_R_DT_1x.T,self.RT_Binv_R_DT_1y,x),
+            xop_fast(self.RT_Binv_R_DT_2x.T,self.RT_Binv_R_DT_2y,x)
         ))
         
         RT_S_x = Buffer(self.Rx.T @ self.Ainv.Sx)
@@ -319,12 +332,15 @@ class Op(pt.nn.Module):
         
         def D_RT_Ainv_R_DT_fn(x):
             t1 = pt.stack((
-                xop(self.ST_R_D1T_x,self.ST_R_D1T_y,x),
-                xop(self.ST_R_D2T_x,self.ST_R_D2T_y,x)
+#               xop(self.ST_R_D1T_x,self.ST_R_D1T_y,x),
+#               xop(self.ST_R_D2T_x,self.ST_R_D2T_y,x)
+                xop_fast(self.ST_R_D1T_x.T,self.ST_R_D1T_y,x),
+                xop_fast(self.ST_R_D2T_x.T,self.ST_R_D2T_y,x)
             ))
             
             t2 = self.Ainv.Dinv*t1
-            return xop(self.D1_RT_S_x,self.D1_RT_S_y,t2[0]) + xop(self.D2_RT_S_x,self.D2_RT_S_y,t2[1])
+#           return xop(self.D1_RT_S_x,self.D1_RT_S_y,t2[0]) + xop(self.D2_RT_S_x,self.D2_RT_S_y,t2[1])
+            return xop_fast(self.D1_RT_S_x.T,self.D1_RT_S_y,t2[0]) + xop_fast(self.D2_RT_S_x.T,self.D2_RT_S_y,t2[1])
         self.D_RT_Ainv_R_DT = D_RT_Ainv_R_DT_fn
         
     def Mb(self, x: Tensor):
@@ -343,16 +359,27 @@ class Op(pt.nn.Module):
         dun = pt.stack((
 #           xop(self.Dbxn,None,vn),
 #           xop(None,self.Dbyn,vn)
-            xop(self.Jxnm_Dbxn,self.Jynm,vn),
-            xop(self.Jxnm,self.Jynm_Dbyn,vn)
+#           xop(self.Jxnm_Dbxn,self.Jynm,vn),
+#           xop(self.Jxnm,self.Jynm_Dbyn,vn)
+            xop_fast(self.Jxnm_Dbxn.T,self.Jynm,vn),
+            xop_fast(self.Jxnm.T,self.Jynm_Dbyn,vn)
         ))
         
-        cu = xop(
-            self.JxnmT_Mbxm,
+#       cu = xop(
+#           self.JxnmT_Mbxm,
+#           self.JynmT_Mbym,
+#           einsum(
+#               'ijk,injk->njk',
+#               xop(self.Jxnm,self.Jynm,cn),
+#               dun
+#           )
+#       )
+        cu = xop_fast(
+            self.JxnmT_Mbxm.T,
             self.JynmT_Mbym,
             einsum(
                 'ijk,injk->njk',
-                xop(self.Jxnm,self.Jynm,cn),
+                xop_fast(self.Jxnm.T,self.Jynm,cn),
                 dun
             )
         )
@@ -380,9 +407,11 @@ class Op(pt.nn.Module):
             self.SyTRy_H = Buffer(self.Hinv.Sy.T @ self.Ry)
             
             def RT_Hinv_R_fn(x):
-                t1=xop(self.SxTRx_H,self.SyTRy_H,x)
+#               t1=xop(self.SxTRx_H,self.SyTRy_H,x)
+                t1=xop_fast(self.SxTRx_H.T,self.SyTRy_H,x)
                 t2=self.Hinv.Dinv * t1
-                t3 = xop(self.RxTSx_H,self.RyTSy_H,t2)
+#               t3 = xop(self.RxTSx_H,self.RyTSy_H,t2)
+                t3 = xop_fast(self.RxTSx_H.T,self.RyTSy_H,t2)
                 return t3
                 
             self.RT_Hinv_R = RT_Hinv_R_fn
@@ -397,13 +426,16 @@ class Op(pt.nn.Module):
         return xop_fast(self.Hbx,self.Mbyn,self.Mbxn,self.Hby,x)
 
     def Db(self, x: Tensor):
-        return xop(self.D1x,self.D1y,x[0]) + xop(self.D2x,self.D2y,x[1])
+#       return xop(self.D1x,self.D1y,x[0]) + xop(self.D2x,self.D2y,x[1])
+        return xop_fast(self.D1x.T,self.D1y,x[0]) + xop_fast(self.D2x.T,self.D2y,x[1])
         
     def R(self, x: Tensor):
-        return xop(self.Rx,self.Ry,x)
+#       return xop(self.Rx,self.Ry,x)
+        return xop_fast(self.Rx.T,self.Ry,x)
         
     def RT(self, x: Tensor):
-        return xop(self.Rx.T,self.Ry.T,x)
+#       return xop(self.Rx.T,self.Ry.T,x)
+        return xop_fast(self.Rx,self.Ry.T,x)
         
     def D(self, x: Tensor, restrict=False):
             y0, y1 = x[0], x[1]
@@ -411,12 +443,15 @@ class Op(pt.nn.Module):
                 y0 = self.RT(y0)
                 y1 = self.RT(y1)
                 
-            return xop(self.D1x,self.D1y,y0) + xop(self.D2x,self.D2y,y1)
+#           return xop(self.D1x,self.D1y,y0) + xop(self.D2x,self.D2y,y1)
+            return xop_fast(self.D1x.T,self.D1y,y0) + xop_fast(self.D2x.T,self.D2y,y1)
             
     def DT(self, x: Tensor, restrict=False):
         res = pt.stack((
-            xop(self.D1x.T,self.D1y.T,x),
-            xop(self.D2x.T,self.D2y.T,x)
+#           xop(self.D1x.T,self.D1y.T,x),
+#           xop(self.D2x.T,self.D2y.T,x)
+            xop_fast(self.D1x,self.D1y.T,x),
+            xop_fast(self.D2x,self.D2y.T,x)
         ))
         if restrict:
             res = self.R(res)
@@ -466,10 +501,13 @@ class Op(pt.nn.Module):
             self.Jxnl = J(xr0, self.x[0]).to(self.x[0].device,dtype=self.x[0].dtype)
             self.Jynl = J(yr0, self.x[1]).to(self.x[1].device,dtype=self.x[1].dtype)
             
-        ur = xop(self.Jxnl,self.Jynl,u)
-        pr = xop(self.Jxnl @ self.Jxpn, self.Jynl @ self.Jypn, p)
+#       ur = xop(self.Jxnl,self.Jynl,u)
+#       pr = xop(self.Jxnl @ self.Jxpn, self.Jynl @ self.Jypn, p)
+        ur = xop_fast(self.Jxnl.T,self.Jynl,u)
+        pr = xop_fast((self.Jxnl @ self.Jxpn).T, self.Jynl @ self.Jypn, p)
         if T is not None:
-            tr = xop(self.Jxnl,self.Jynl,T)
+#           tr = xop(self.Jxnl,self.Jynl,T)
+            tr = xop_fast(self.Jxnl.T,self.Jynl,T)
         else:
             tr = None
        

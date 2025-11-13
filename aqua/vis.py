@@ -6,7 +6,7 @@ import torch as pt
 from .op2d import Op
 from .util import mag
 
-def vis(sol,op: Op,T=None,folder='cache/',i=None):
+def vis(sol,sollag,op: Op,T=None,folder='cache/',i=None):
     
     if i is None:
         istr = ''
@@ -16,9 +16,12 @@ def vis(sol,op: Op,T=None,folder='cache/',i=None):
     u = sol.u
     p = sol.p
     T = sol.T
+
+    E = pt.tensordot(op.Mb(u),u,dims=u.dim())
     
     v,q,S = op.refine(u,p,T)
-    
+#   v,q,S = u*1,p*1,T*1
+
     v = v.flip(dims=(1,))
     vmag = mag(v)
     
@@ -32,12 +35,33 @@ def vis(sol,op: Op,T=None,folder='cache/',i=None):
     if S is not None:
         S = S.cpu()
     
+    print(f'E: {E.item():.6e}')
     print(f'umag: min,max = {vmag.min().item():.3f},{vmag.max().item():.3f}')
     print(f'u: min,max = {v[0].min().item():.3f},{v[0].max().item():.3f}')
     print(f'v: min,max = {v[1].min().item():.3f},{v[1].max().item():.3f}')
     print(f'p: min,max = {q.min().item():.3f},{q.max().item():.3f}')
     if S is not None:
         print(f'T: min,max = {S.min().item():.3f},{S.max().item():.3f}')
+
+    if sollag is not None:
+        ul = sollag.u
+        pl = sollag.p
+        Tl = sollag.T
+
+#       vl,ql,Sl = ul*1,pl*1,Tl*1
+        vl,ql,Sl = op.refine(ul,pl,Tl)
+        
+        vl = vl.flip(dims=(1,))
+        ql = ql.flip(dims=(0,))
+
+        ud = v[0] - vl[0]
+        vd = v[1] - vl[1]
+
+        qd = q - ql
+
+        print(f'ud: min,max = {ud.min().item():.3e},{ud.max().item():.3e}')
+        print(f'vd: min,max = {vd.min().item():.3e},{vd.max().item():.3e}')
+        print(f'pd: min,max = {qd.min().item():.3e},{qd.max().item():.3e}')
     
     cm = get_cmap('turbo',2048)
     

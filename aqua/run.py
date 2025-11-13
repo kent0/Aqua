@@ -1,31 +1,34 @@
-from op2d import Op
-import cProfile
-import io
-from setops import setops
-from problem import problem
-from advance import BDFEXT, Solution
+from .op2d import Op
+from .setops import setops
+from .problem import problem
+from .advance import BDFEXT, Solution
+
+from .util import mag
+from .vis import vis
+from .ns import ns
+from .stokes import stokes
+
 import matplotlib.pyplot as plt
-import torch as pt
-from util import mag
-from vis import vis
-import numpy as np
-from ns import ns
-from stokes import stokes
+
+import cProfile
 import pstats
+import io
 import os
+
+import numpy as np
+import torch as pt
 
 def main():
     Nx=128
     Ny=Nx
     tf=2e2
-#   tf=4e1
     dt=2.5e-3
+
     nu=1/3000
-    iotime=tf / 1000
+    iotime=0.1
     iptime=1
     
     nuis = pt.linspace(3000,4000,21)
-    nuis = nuis[1:]
     
     pt.set_default_dtype(pt.float64)
 
@@ -38,7 +41,7 @@ def main():
     for nui in nuis:
         nu = 1 / nui
         nui_str = str(int(pt.round(nui)))
-        dir = f'data/{nui_str}/'
+        dir = f'data_new/{nui_str}/'
         os.makedirs(dir, exist_ok=True)
         sol,op = ns(Nx,Ny,tf,dt,cname,nu,u0=sol_stokes,iptime=iptime,iotime=iotime,pfx=dir)
 

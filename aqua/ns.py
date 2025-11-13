@@ -48,17 +48,20 @@ def ns(Nx,Ny,tf,dt,cname,nu,u0=None,pfx="",ifconv=True,iotime=0,iptime=1,dtype=p
     iostep = int(np.round(iotime/dt))
     ipstep = int(np.round(iptime/dt))
     
-    def cb(istep,t,sol,op):
-        future = executor.submit(io_tasks,istep,t,sol,op)
+    def cb(istep,t,sol,sollag,Ehist,op):
+        future = executor.submit(io_tasks,istep,t,sol,sollag,Ehist,op)
         return future
 #       io_tasks(istep,t,sol,op)
         
-    def io_tasks(istep,t,sol,op):
+    def io_tasks(istep,t,sol,sollag,Ehist,op):
         folder=pfx
+#       qoi = np.append(qoi,E.item())
+#       print(E.item())
+
         if np.mod(istep,ipstep) == 0:
             print(f'\nStep {istep}, t={t:.3f}')
             i=int(np.round((istep)/ipstep))
-            vis(sol,op,i=i,folder=folder)
+            vis(sol,sollag,op,i=i,folder=folder)
             
         if np.mod(istep,iostep) == 0:
             uc = sol.u.cpu()
@@ -73,6 +76,7 @@ def ns(Nx,Ny,tf,dt,cname,nu,u0=None,pfx="",ifconv=True,iotime=0,iptime=1,dtype=p
                 h5f.create_dataset('p',data=pc)
                 h5f.create_dataset('nu',data=nu)
                 h5f.create_dataset('t',data=tc)
+                h5f.create_dataset('Ehist',data=Ehist)
                 if sol.T is not None:
                     h5f.create_dataset('T',data=sol.T.cpu())
 

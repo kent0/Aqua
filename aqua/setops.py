@@ -41,8 +41,8 @@ def genops(N,dom,fullmass=False):
         Mbx = Jxn1.T @ Mbx1 @ Jxn1
         Mby = Jyn1.T @ Mby1 @ Jyn1
     else:
-        Mbx=wxn
-        Mby=wyn
+        Mbx=pt.diag(wxn)
+        Mby=pt.diag(wyn)
     
     Dbx=D(xn)
     Dby=D(yn)
@@ -53,6 +53,8 @@ def setops(Nu,dom,bc:str,fullmass=False):
     Np=(Nu[0]-2,Nu[1]-2)
     Nd=(int(math.ceil(1.5*Nu[0])),int(math.ceil(1.5*Nu[1])))
     
+    Mbxn_diag,Mbyn_diag,Dbxn,Dbyn,Xn = genops(Nu,dom,fullmass=False)
+
     Mbxn,Mbyn,Dbxn,Dbyn,Xn = genops(Nu,dom,fullmass=fullmass)
     Mbxm,Mbym,Dbxm,Dbym,Xm = genops(Nd,dom,fullmass=fullmass)
     Mbxp,Mbyp,Dbxp,Dbyp,Xp = genops(Np,dom,fullmass=fullmass)
@@ -87,6 +89,7 @@ def setops(Nu,dom,bc:str,fullmass=False):
     
     return [
             Buffer(x) for x in [
+            Mbxn_diag,Mbyn_diag,
             Mbxn,Mbyn,Dbxn,Dbyn,Xn,
             Mbxm,Mbym,Dbxm,Dbym,Xm,
             Mbxp,Mbyp,Dbxp,Dbyp,Xp,

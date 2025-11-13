@@ -14,7 +14,6 @@ class Solution(nn.Module):
         self.p = Buffer(p) if p is not None else None
         self.T = Buffer(T) if T is not None else None
         
-
 def cf64(x: Tensor):
     return x.cpu().to(dtype=pt.float64)
 
