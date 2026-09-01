@@ -1,6 +1,5 @@
 from matplotlib import pyplot as plt
 from matplotlib.image import imsave
-from matplotlib.cm import get_cmap
 import torch as pt
 
 from .op2d import Op
@@ -63,7 +62,7 @@ def vis(sol,sollag,op: Op,T=None,folder='cache/',i=None):
         print(f'vd: min,max = {vd.min().item():.3e},{vd.max().item():.3e}')
         print(f'pd: min,max = {qd.min().item():.3e},{qd.max().item():.3e}')
     
-    cm = get_cmap('turbo',2048)
+    cm = plt.get_cmap('turbo',2048)
     
     imsave(folder+f'umag{istr}.png', vmag,cmap=cm)
     imsave(folder+f'u{istr}.png', v[0],cmap=cm)
